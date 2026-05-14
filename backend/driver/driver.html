@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Driver Live Tracking</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        /* ADD YOUR EXISTING CSS HERE */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+
+        h2 {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+            font-size: 1.8em;
+        }
+
+        #controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 10px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        #resetBtn {
+            background: #ffa502;
+            color: white;
+        }
+
+        #resetBtn:hover {
+            background: #ff7f00;
+        }
+
+        #completedBtn {
+            background: #2ed573;
+            color: white;
+        }
+
+        #completedBtn:hover {
+            background: #26de81;
+        }
+
+        #refreshBtn {
+            background: #1abc9c;
+            color: white;
+        }
+
+        #refreshBtn:hover {
+            background: #16a085;
+        }
+
+        #logoutBtn {
+            background: #ff4757;
+            color: white;
+        }
+
+        #logoutBtn:hover {
+            background: #ee3344;
+        }
+
+        #debugBtn {
+            background: #3742fa;
+            color: white;
+        }
+
+        #debugBtn:hover {
+            background: #2e3bde;
+        }
+
+        #infoBox {
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            width: 340px;
+            margin: 15px auto;
+            font-size: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        #infoBox b {
+            color: #667eea;
+        }
+
+        #infoBox span {
+            color: #333;
+            font-weight: 600;
+        }
+
+        #studentCount {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .skip-warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            padding: 8px;
+            border-radius: 5px;
+            margin-top: 8px;
+            text-align: center;
+            font-weight: bold;
+            color: #856404;
+            font-size: 13px;
+        }
+
+        #map {
+            width: 100%;
+            height: calc(100vh - 280px);
+            border-top: 3px solid #667eea;
+        }
+
+        #status {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            font-size: 14px;
+        }
+
+        #legend {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            font-size: 12px;
+        }
+
+        #legend h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+
+        .legend-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        #debugInfo {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 11px;
+            z-index: 1000;
+            max-width: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            margin-right: 8px;
+        }
+
+        .status-dot.active {
+            background: #2ed573;
+        }
+
+        .status-dot.stale {
+            background: #ff4757;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .updating {
+            color: #667eea;
+            font-size: 12px;
+        }
+
+        .gps-info {
+            color: #999;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 20% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-content h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .modal-content p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .modal-btn.confirm {
+            background: #ff4757;
+            color: white;
+        }
+
+        .modal-btn.confirm:hover {
+            background: #ee3344;
+        }
+
+        .modal-btn.cancel {
+            background: #ddd;
+            color: #333;
+        }
+
+        .modal-btn.cancel:hover {
+            background: #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>🚌 Driver Live Tracking</h2>
+
+    <div id="controls">
+        <button id="resetBtn" onclick="resetRoute()">🔄 Reset Route</button>
+        <button id="completedBtn" onclick="showCompleted()">✅ View Completed</button>
+        <button id="refreshBtn" onclick="fetchStopsWithStudents()">🔃 Refresh</button>
+        <button id="debugBtn" onclick="toggleDebug()">🔍 Debug</button>
+        <button id="logoutBtn" onclick="showLogoutModal()">🚪 Logout</button>
+    </div>
+
+    <div id="infoBox">
+        <b>Next Stop:</b> <span id="nextStop">Loading...</span><br>
+        <b>Students Coming:</b> <span id="studentCount" style="color: #2ed573;">--</span> 👨‍🎓<br>
+        <b>ETA:</b> <span id="eta">--</span> mins<span class="distance-badge" id="distanceBadge">ROAD</span><br>
+        <b>Distance:</b> <span id="distance">--</span> km<br>
+        <b>Speed:</b> <span id="speed">--</span> km/h<br>
+        <b>Completed:</b> <span id="completedCount">0</span> stops<br>
+        <span class="updating" id="updateStatus">Initializing...</span><br>
+        <span class="gps-info" id="gpsInfo">GPS: --</span>
+        <div id="skipWarning"></div>
+    </div>
+
+    <div id="status">
+        <span class="status-dot active" id="statusDot"></span>
+        <span id="statusText">Live Tracking</span>
+    </div>
+
+    <div id="legend">
+        <h4>📍 Legend</h4>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: #2ed573;">5</div>
+            <span>Students</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: #ff4757;">0</div>
+            <span>Skip</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: #95a5a6;">✓</div>
+            <span>Done</span>
+        </div>
+    </div>
+
+    <div id="debugInfo">
+        <div id="debugContent">Debug info...</div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Logout Modal -->
+    <div id="logoutModal" class="modal">
+        <div class="modal-content">
+            <h3>⚠️ Confirm Logout</h3>
+            <p>This will clear all data and stop tracking.</p>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="closeLogoutModal()">Cancel</button>
+                <button class="modal-btn confirm" onclick="confirmLogout()">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mapbox-polyline/1.1.1/polyline.js"></script>
+    <script>
+        const driver_id = 3;
+        let route_id = null;
+        const shift = 'Morning';
+
+        let stops = [];
+        let stopsWithStudents = [];
+        let stopMarkers = [];
+        let routeLine = null;
+        let map = null;
+        let nextStopData = null;
+        let watchId = null;
+        let lastUpdateTime = Date.now();
+        let lastPosition = null;
+        let debugMode = false;
+        let busMarker = null;
+        let accuracyCircle = null;
+        const socket = io();
+
+        // 🆕 OSRM Road Distance Variables
+        let lastRoadDistanceCall = 0;
+        let cachedRoadDistance = null;
+        let isCalculatingRoadDistance = false;
+
+        const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
+
+        // Haversine formula (FALLBACK ONLY)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // 🆕 OSRM Road Distance Calculation
+        async function calculateRoadDistanceOSRM(fromLat, fromLon, toLat, toLon) {
+            try {
+                const url = `https://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=false`;
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                    return {
+                        distance: data.routes[0].distance / 1000, // meters to km
+                        duration: data.routes[0].duration / 60,    // seconds to minutes
+                        success: true,
+                        method: 'road'
+                    };
+                }
+                console.warn('OSRM returned no routes');
+                return null;
+            } catch (err) {
+                console.error("OSRM error:", err);
+                return null;
+            }
+        }
+
+        // 🆕 Throttled Road Distance (prevents excessive API calls)
+        async function getThrottledRoadDistance(fromLat, fromLon, toLat, toLon) {
+            const now = Date.now();
+
+            // Cache for 5 seconds
+            if (now - lastRoadDistanceCall < 5000 && cachedRoadDistance) {
+                return cachedRoadDistance;
+            }
+
+            if (isCalculatingRoadDistance) {
+                return cachedRoadDistance || {
+                    distance: calculateDistance(fromLat, fromLon, toLat, toLon),
+                    duration: null,
+                    success: false,
+                    method: 'straight'
+                };
+            }
+
+            isCalculatingRoadDistance = true;
+
+            // Try OSRM
+            let result = await calculateRoadDistanceOSRM(fromLat, fromLon, toLat, toLon);
+
+            // Fallback to straight-line
+            if (!result) {
+                console.warn('⚠️ OSRM failed, using straight-line distance');
+                result = {
+                    distance: calculateDistance(fromLat, fromLon, toLat, toLon),
+                    duration: null,
+                    success: false,
+                    method: 'straight'
+                };
+            }
+
+            lastRoadDistanceCall = now;
+            cachedRoadDistance = result;
+            isCalculatingRoadDistance = false;
+            return result;
+        }
+
+        // Estimate ETA
+        function estimateETA(distanceKm, speedKmh) {
+            if (speedKmh && speedKmh > 5) {
+                return Math.max(1, Math.round((distanceKm / speedKmh) * 60));
+            }
+            return Math.max(1, Math.round((distanceKm / 30) * 60));
+        }
+
+        // Fetch stops with student counts
+        async function fetchStopsWithStudents() {
+            try {
+                console.log('🔃 Fetching student counts...');
+                const res = await fetch(`/driver/stop-student-count?driver_id=${driver_id}&shift=${shift}`);
+                const data = await res.json();
+
+                if (data.success) {
+                    stopsWithStudents = data.data;
+                    console.log('✅ Student counts loaded');
+                    updateMapMarkers();
+                    updateNextStopStudentCount();
+                }
+            } catch (err) {
+                console.error("Error fetching student counts:", err);
+            }
+        }
+
+        // Update map markers with student counts
+        function updateMapMarkers() {
+            stopMarkers.forEach(marker => map.removeLayer(marker));
+            stopMarkers = [];
+
+            stopsWithStudents.forEach((stop) => {
+                const color = stop.is_completed ? '#95a5a6' :
+                    stop.coming_today === 0 ? '#ff4757' : '#2ed573';
+
+                const displayText = stop.is_completed ? '✓' : stop.coming_today;
+
+                const icon = L.divIcon({
+                    className: '',
+                    html: `<div style="
+                        background: ${color};
+                        color: white;
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: bold;
+                        font-size: 16px;
+                        border: 3px solid white;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                    ">${displayText}</div>`,
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20]
+                });
+
+                const marker = L.marker([stop.latitude, stop.longitude], { icon })
+                    .addTo(map)
+                    .bindPopup(`
+                        <div style="text-align: center;">
+                            <b>${stop.stop_name}</b><br><hr style="margin:5px 0;">
+                            <b style="color: #2ed573;">✅ ${stop.coming_today}</b> |
+                            <span style="color: #ff4757;">❌ ${stop.not_coming_today}</span><br>
+                            📊 Total: ${stop.total_students}<br>
+                            ${stop.should_skip ? '<b style="color:#ffa502;">⚠️ MAY SKIP</b>' : ''}
+                            ${stop.is_completed ? '<b style="color:#95a5a6;">✅ DONE</b>' : ''}
+                        </div>
+                    `);
+
+                stopMarkers.push(marker);
+            });
+        }
+
+        // Update student count for next stop
+        function updateNextStopStudentCount() {
+            if (nextStopData && stopsWithStudents.length > 0) {
+                const stopData = stopsWithStudents.find(s =>
+                    Math.abs(s.latitude - nextStopData.lat) < 0.0001 &&
+                    Math.abs(s.longitude - nextStopData.lng) < 0.0001
+                );
+
+                if (stopData) {
+                    const countEl = document.getElementById("studentCount");
+                    countEl.innerText = stopData.coming_today;
+
+                    if (stopData.coming_today === 0) {
+                        countEl.style.color = '#ff4757';
+                        countEl.style.fontSize = '32px';
+                        document.getElementById("skipWarning").innerHTML =
+                            '<div class="skip-warning">⚠️ No students - Consider skipping</div>';
+                    } else if (stopData.coming_today < 3) {
+                        countEl.style.color = '#ffa502';
+                        countEl.style.fontSize = '28px';
+                        document.getElementById("skipWarning").innerHTML = '';
+                    } else {
+                        countEl.style.color = '#2ed573';
+                        countEl.style.fontSize = '28px';
+                        document.getElementById("skipWarning").innerHTML = '';
+                    }
+                }
+            }
+        }
+
+        // Get Next Stop
+        async function fetchNextStop() {
+            try {
+                const res = await fetch(`/driver/eta/${driver_id}`);
+                const data = await res.json();
+
+                if (data.success) {
+                    nextStopData = {
+                        name: data.next_stop,
+                        lat: data.next_stop_lat,
+                        lng: data.next_stop_lng,
+                        order: data.stop_order
+                    };
+                    document.getElementById("nextStop").innerText = data.next_stop;
+                    updateNextStopStudentCount();
+                }
+            } catch (err) {
+                console.error("Fetch next stop error:", err);
+            }
+        }
+
+        // Initialize Map
+        async function initMap() {
+            try {
+                const res = await fetch(`/driver/driver-routes/${driver_id}`);
+                const data = await res.json();
+
+                if (data.success && data.stops) {
+                    stops = data.stops;
+                    route_id = data.route_id;
+                    console.log("✅ Stops loaded:", stops);
+                } else {
+                    stops = [
+                        { latitude: 16.69612371, longitude: 74.21847876 },  // RANKALA BUS STAND
+                        { latitude: 16.67844726, longitude: 74.22397193 },  // NIRMAN CHOWK
+                        { latitude: 16.67450067, longitude: 74.23676070 },  // SUBHASH NAGAR CHOWK
+                        { latitude: 16.66266040, longitude: 74.23993644 },  // RK NAGAR
+                        { latitude: 16.65451617, longitude: 74.26181243 }   // KIT
+                    ];
+                    alert("Route drawn based on else")
+                }
+            } catch (err) {
+                console.error("Error fetching stops:", err);
+                stops = [
+                    { latitude: 16.69612371, longitude: 74.21847876 },  // RANKALA BUS STAND
+                    { latitude: 16.67844726, longitude: 74.22397193 },  // NIRMAN CHOWK
+                    { latitude: 16.67450067, longitude: 74.23676070 },  // SUBHASH NAGAR CHOWK
+                    { latitude: 16.66266040, longitude: 74.23993644 },  // RK NAGAR
+                    { latitude: 16.65451617, longitude: 74.26181243 }   // KIT
+                ];
+                alert("route drawn based on catch",err)
+            }
+
+            const firstStop = stops[0];
+            map = L.map('map').setView([firstStop.latitude, firstStop.longitude], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            await drawRoute();
+        }
+
+        async function drawRoute() {
+            try {
+                const coords = stops.map(s => [s.longitude, s.latitude]);
+                const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": apiKey,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ coordinates: coords })
+                });
+
+                const data = await res.json();
+                const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+
+                if (routeLine) {
+                    map.removeLayer(routeLine);
+                }
+                routeLine = L.polyline(routeCoords, { color: "#667eea", weight: 5 }).addTo(map);
+            } catch (err) {
+                console.error("Route drawing error:", err);
+            }
+        }
+
+        // Bus marker icon
+        const currentLocationIcon = L.divIcon({
+            className: '',
+            html: `<div style="
+                width: 20px; height: 20px; 
+                background: #ff4757; 
+                border: 3px solid white; 
+                border-radius: 50%;
+                box-shadow: 0 0 10px rgba(255,71,87,0.5);
+                animation: pulse-red 2s infinite;
+            "></div>
+            <style>
+                @keyframes pulse-red {
+                    0%, 100% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.2); opacity: 0.7; }
+                }
+            </style>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
+        async function updateCompletedCount() {
+            try {
+                const res = await fetch(`/driver/completed-stops/${driver_id}`);
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById("completedCount").innerText = data.total_completed || 0;
+                }
+            } catch (err) {
+                console.error("Completed count error:", err);
+            }
+        }
+
+        function updateDebugInfo(info) {
+            if (debugMode) {
+                document.getElementById('debugContent').innerHTML = `
+                    GPS: ${info.latitude.toFixed(6)}, ${info.longitude.toFixed(6)}<br>
+                    Accuracy: ±${info.accuracy.toFixed(1)}m<br>
+                    Speed: ${info.speed ? (info.speed * 3.6).toFixed(1) : '0'} km/h<br>
+                    Shift: ${shift}<br>
+                    ${info.nextStop ? `Next: ${info.nextStop.name}<br>
+                    Distance: ${info.nextStop.distance.toFixed(2)}km (${info.nextStop.method})<br>
+                    ${info.nextStop.duration ? `Duration: ${info.nextStop.duration.toFixed(1)} min` : ''}` : ''}
+                `;
+            }
+        }
+
+        function toggleDebug() {
+            debugMode = !debugMode;
+            document.getElementById('debugInfo').style.display = debugMode ? 'block' : 'none';
+        }
+
+        // 🆕 Handle Location Update with OSRM Road Distance
+        async function handleLocationUpdate(position) {
+            const { latitude, longitude, speed, accuracy, altitude, heading } = position.coords;
+            const now = Date.now();
+            const timeSinceLastUpdate = (now - lastUpdateTime) / 1000;
+
+            console.log('📍 GPS:', latitude, longitude, `±${accuracy}m`);
+
+            lastUpdateTime = now;
+            document.getElementById("statusDot").className = "status-dot active";
+            document.getElementById("gpsInfo").innerText = `GPS: ±${accuracy.toFixed(0)}m | ${new Date().toLocaleTimeString()}`;
+
+            let currentSpeed = speed ? speed * 3.6 : 0;
+
+            if (!speed && lastPosition) {
+                const distance = calculateDistance(
+                    lastPosition.latitude, lastPosition.longitude,
+                    latitude, longitude
+                );
+                currentSpeed = (distance / timeSinceLastUpdate) * 3600;
+            }
+
+            lastPosition = { latitude, longitude };
+            const position_coords = [latitude, longitude];
+
+            // Accuracy circle
+            if (accuracyCircle) map.removeLayer(accuracyCircle);
+            accuracyCircle = L.circle(position_coords, {
+                radius: accuracy,
+                color: '#3742fa',
+                fillColor: '#3742fa',
+                fillOpacity: 0.1,
+                weight: 1
+            }).addTo(map);
+
+            // Bus marker
+            if (!busMarker) {
+                busMarker = L.marker(position_coords, { icon: currentLocationIcon })
+                    .addTo(map)
+                    .bindPopup(`🚌 Your Location<br>±${accuracy.toFixed(0)}m`);
+                map.setView(position_coords, 16);
+            } else {
+                busMarker.setLatLng(position_coords);
+                busMarker.setPopupContent(`🚌 Location<br>±${accuracy.toFixed(0)}m<br>${currentSpeed.toFixed(1)} km/h`);
+                map.panTo(position_coords, { animate: true, duration: 0.5 });
+            }
+
+            // 🆕 Calculate Road Distance using OSRM
+            if (nextStopData && nextStopData.lat && nextStopData.lng) {
+                const roadData = await getThrottledRoadDistance(
+                    latitude, longitude,
+                    nextStopData.lat, nextStopData.lng
+                );
+
+                if (roadData) {
+                    // Update distance
+                    document.getElementById("distance").innerText = roadData.distance.toFixed(2);
+
+                    // Update badge
+                    const badge = document.getElementById("distanceBadge");
+                    if (roadData.method === 'road') {
+                        badge.innerText = 'ROAD';
+                        badge.style.background = '#2ed573';
+                    } else {
+                        badge.innerText = 'DIRECT';
+                        badge.style.background = '#ff4757';
+                    }
+
+                    // Calculate ETA
+                    let eta;
+                    if (roadData.duration && roadData.method === 'road') {
+                        eta = Math.ceil(roadData.duration);
+                    } else {
+                        eta = estimateETA(roadData.distance, currentSpeed);
+                    }
+
+                    document.getElementById("eta").innerText = eta;
+                    document.getElementById("speed").innerText = currentSpeed > 1 ? currentSpeed.toFixed(1) : "0";
+                    document.getElementById("updateStatus").innerText =
+                        `Updated ${new Date().toLocaleTimeString()} (${roadData.method === 'road' ? 'Road' : 'Direct'})`;
+
+                    updateDebugInfo({
+                        latitude, longitude, accuracy, speed, altitude, heading,
+                        nextStop: {
+                            name: nextStopData.name,
+                            lat: nextStopData.lat,
+                            lng: nextStopData.lng,
+                            distance: roadData.distance,
+                            duration: roadData.duration,
+                            method: roadData.method
+                        }
+                    });
+                }
+            }
+
+            // Send to server
+            if (timeSinceLastUpdate >= 2) {
+                fetch("/driver/update-location", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ driver_id, latitude, longitude })
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.completed_stops && data.completed_stops.length > 0) {
+                            console.log("✅ Completed:", data.completed_stops);
+                            updateCompletedCount();
+                            fetchNextStop();
+                            fetchStopsWithStudents();
+                            // Clear cache when stop completed
+                            cachedRoadDistance = null;
+                        }
+                    })
+                    .catch(err => console.error("Location update error:", err));
+            }
+        }
+
+        function handleLocationError(error) {
+            console.error("GPS error:", error);
+            document.getElementById("statusDot").className = "status-dot stale";
+            document.getElementById("statusText").innerText = "GPS Error";
+            document.getElementById("gpsInfo").innerText = `Error: ${error.message}`;
+        }
+
+        function startTracking() {
+            if (navigator.geolocation) {
+                watchId = navigator.geolocation.watchPosition(
+                    handleLocationUpdate,
+                    handleLocationError,
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+                );
+                navigator.geolocation.watchPosition((position) => {
+                    const { latitude, longitude } = position.coords;
+                    socket.emit('send-location', { driver_id: driver_id, latitude, longitude })
+                },
+                    (error) => {
+                        console.error("Socket GPS error:", error);
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
+
+                console.log("✅ GPS tracking started");
+            } else {
+                alert("Geolocation not supported");
+            }
+        }
+
+        function stopTracking() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+        }
+
+        // Auto-refresh
+        setInterval(fetchStopsWithStudents, 60000);
+        setInterval(fetchNextStop, 30000);
+        setInterval(() => {
+            if ((Date.now() - lastUpdateTime) / 1000 > 10) {
+                document.getElementById("statusDot").className = "status-dot stale";
+                document.getElementById("statusText").innerText = "GPS Stale";
+            }
+        }, 5000);
+
+        async function resetRoute() {
+            if (!confirm("Reset route?")) return;
+            try {
+                const res = await fetch("/driver/reset-route", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ driver_id })
+                });
+                const data = await res.json();
+                alert(data.message);
+                updateCompletedCount();
+                fetchNextStop();
+                fetchStopsWithStudents();
+                cachedRoadDistance = null;
+            } catch (err) {
+                alert("Error resetting");
+            }
+        }
+
+        async function showCompleted() {
+            try {
+                const res = await fetch(`/driver/completed-stops/${driver_id}`);
+                const data = await res.json();
+
+                if (data.completed_stops.length === 0) {
+                    alert("No stops completed!");
+                } else {
+                    const list = data.completed_stops.map(s =>
+                        `${s.stop_order}. ${s.name} - ${new Date(s.completed_at).toLocaleTimeString()}`
+                    ).join('\n');
+                    alert(`Completed:\n\n${list}`);
+                }
+            } catch (err) {
+                alert("Error");
+            }
+        }
+
+        function showLogoutModal() {
+            document.getElementById('logoutModal').style.display = 'block';
+        }
+
+        function closeLogoutModal() {
+            document.getElementById('logoutModal').style.display = 'none';
+        }
+
+        async function confirmLogout() {
+            try {
+                stopTracking();
+                await fetch("/driver/reset-route", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ driver_id })
+                });
+                await fetch("/driver/clear-location", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ driver_id })
+                });
+                alert("✅ Logout successful!");
+                window.location.href = "/";
+            } catch (err) {
+                alert("Error: " + err.message);
+                closeLogoutModal();
+            }
+        }
+
+        window.onclick = function (event) {
+            if (event.target == document.getElementById('logoutModal')) {
+                closeLogoutModal();
+            }
+        }
+
+        // Initialize
+        console.log(`🚌 Driver App - Shift: ${shift}`);
+        initMap().then(() => {
+            socket.emit('subscribe-driver', driver_id);
+            fetchNextStop();
+            fetchStopsWithStudents();
+            startTracking();
+            updateCompletedCount();
+        });
+
+        window.addEventListener('beforeunload', stopTracking);
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tracking</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+        integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            width: 100%;
+            font-family: Arial, sans-serif;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        /* 🆕 NEW CSS FOR THE RED DOT MARKER AND ANIMATION */
+        .bus-marker-dot {
+            width: 20px;
+            height: 20px;
+            background: #ff4757;
+            /* Bright Red */
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(255, 71, 87, 0.5);
+            animation: pulse-red 2s infinite;
+        }
+
+        @keyframes pulse-red {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.2);
+                opacity: 0.7;
+            }
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            min-width: 250px;
+        }
+
+        .info-panel h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+            font-size: 18px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 8px;
+        }
+
+        .info-item {
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .info-label {
+            color: #666;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .distance-value {
+            color: #667eea;
+        }
+
+        .eta-value {
+            color: #ff4757;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #48c774;
+            margin-right: 5px;
+            animation: blink 2s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div class="info-panel">
+        <h3>🚌 Bus Tracking</h3>
+        <div class="info-item">
+            <span class="info-label">Distance:</span>
+            <span class="info-value distance-value">
+                <span id="display-distance">--</span> km
+            </span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">ETA:</span>
+            <span class="info-value eta-value">
+                <span id="display-eta">--</span> min
+            </span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Status:</span>
+            <span class="info-value">
+                <span class="status-indicator"></span>Live
+            </span>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"
+        integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
+        let routeLine = null;
+        let studentMarker = null;
+        let studentStopLocation = null;
+        const stops = [
+            { latitude: 16.57865479, longitude: 74.29502221 },
+            { latitude: 16.58377964, longitude: 74.30980429 },
+            { latitude: 16.62039870, longitude: 74.29770568 },
+            { latitude: 16.63783643, longitude: 74.27932786 },
+            { latitude: 16.65451617, longitude: 74.26181243 }
+        ];
+
+        const studentStopIcon = L.divIcon({
+            className: 'student-stop-icon',
+            html: `<div style="
+            width: 30px; height: 30px; 
+            background: #667eea; /* Blue */
+            color: white;
+            border: 4px solid #fff; 
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+        ">S</div>`, /* 'S' for Student */
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
+
+        const map = L.map("map").setView([0, 0], 10);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: "OpenStreetMap"
+        }).addTo(map);
+
+        const markers = {};
+
+        let busLocation = null;
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c; // Distance in kilometers
+        }
+
+        // 🆕 NEW: Simple ETA Estimation (The Time Algorithm)
+        function estimateETA(distanceKm) {
+            const averageSpeedKmh = 30; // Using a fixed average speed
+            if (distanceKm === 0) return 1;
+            return Math.max(1, Math.round((distanceKm / averageSpeedKmh) * 60)); // Result in minutes
+        }
+        async function drawRoute() {
+            try {
+                const coords = stops.map(s => [s.longitude, s.latitude]);
+                const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+                    method: "POST",
+                    headers: {
+                        // NOTE: This key is crucial for OpenRouteService
+                        "Authorization": apiKey,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ coordinates: coords })
+                });
+
+                // CRITICAL: Check if the API response was successful
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    console.error("ORS API Error:", errorData);
+                    throw new Error(`ORS API failed with status: ${res.status}`);
+                }
+
+                const data = await res.json();
+                // Map GeoJSON coordinates from [lng, lat] to Leaflet's [lat, lng]
+                const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+
+                if (routeLine) {
+                    map.removeLayer(routeLine);
+                }
+                routeLine = L.polyline(routeCoords, { color: "#667eea", weight: 5 }).addTo(map);
+
+                // Optional: Adjust map to fit the route
+                map.fitBounds(routeLine.getBounds());
+
+            } catch (err) {
+                console.error("Route drawing error:", err);
+                // Fallback to drawing a straight line if API fails
+                const straightCoords = stops.map(s => [s.latitude, s.longitude]);
+                routeLine = L.polyline(straightCoords, { color: "#ff7f00", weight: 3, dashArray: '5, 10' }).addTo(map);
+            }
+        }
+
+        let data = {
+            name: "KAGAL 1ST STOP",
+            latitude: 16.58377964,
+            longitude: 74.30980429
+        }
+
+        async function placeStudentStopMarker() {
+            try {
+                // 🆕 You need a new backend endpoint to get the student's stop details
+
+
+                const { name, latitude, longitude } = data;
+                studentStopLocation = { latitude, longitude };
+
+
+                if (studentMarker) {
+                    map.removeLayer(studentMarker);
+                }
+
+                studentMarker = L.marker([latitude, longitude], { icon: studentStopIcon })
+                    .addTo(map)
+                    .bindPopup(`<b>Your Stop:</b> ${name}`);
+
+                // Optional: Center the map on the student's stop when loaded
+                map.setView([latitude, longitude], 14);
+
+            } catch (err) {
+                console.error("Error placing student stop marker:", err);
+            }
+        }
+
+        // ... (Your custom icon and socket logic remains the same) ...
+
+        // 🆕 FIX 2: Call drawRoute() to make the route appear
+        placeStudentStopMarker();
+        drawRoute();
+
+
+
+        // 🆕 Define the Custom Icon (Red Dot with Animation)
+        const busIcon = L.divIcon({
+            className: 'bus-marker-icon', // Assign a class for styling
+            html: `<div class="bus-marker-dot"></div>`,
+            iconSize: [26, 26], // Size of the whole icon container
+            iconAnchor: [13, 13] // Anchor point to center the dot
+        });
+
+        function updateDistanceAndETA() {
+            if (busLocation && studentStopLocation) {
+                const distance = calculateDistance(
+                    busLocation.latitude, busLocation.longitude,
+                    studentStopLocation.latitude, studentStopLocation.longitude
+                );
+                const eta = estimateETA(distance);
+
+                // 🆕 FIX: Target the new display elements
+                document.getElementById('display-distance').innerText = distance.toFixed(2);
+                document.getElementById('display-eta').innerText = eta;
+            }
+        }
+
+        socket.on("receive-location", (data) => {
+            const { id, latitude, longitude } = data;
+            console.log(`Received location for ${id}: (${latitude}, ${longitude})`);
+
+            // map.setView([latitude, longitude], 16); // Removed this to prevent map from constantly jumping
+
+            if (markers[id]) {
+                markers[id].setLatLng([latitude, longitude]);
+                busLocation = { latitude, longitude } // Update existing marker
+            } else {
+                // Use the custom icon for the new marker
+                markers[id] = L.marker([latitude, longitude], { icon: busIcon })
+                    .addTo(map)
+                    .bindPopup(`Bus ID: ${id}`); // Add a popup for identification
+
+                // Set initial view on the first received location
+                map.setView([latitude, longitude], 16);
+            }
+            updateDistanceAndETA();
+        });
+
+        socket.on("user-disconnected", (id) => {
+            if (markers[id]) {
+                map.removeLayer(markers[id]);
+                delete markers[id];
+            }
+        });
+    </script>
+</body>
+
+</html>

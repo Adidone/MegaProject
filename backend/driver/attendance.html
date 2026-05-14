@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mark Attendance</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+        
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        
+        .option {
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid #ddd;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .option.yes {
+            background: #2ed573;
+            color: white;
+            border-color: #2ed573;
+        }
+        
+        .option.no {
+            background: #ff4757;
+            color: white;
+            border-color: #ff4757;
+        }
+        
+        .option:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .status {
+            text-align: center;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+            font-weight: 600;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        label {
+            font-weight: 600;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🚌 Mark Today's Attendance</h2>
+        
+        <label for="studentId">Student ID:</label>
+        <input type="number" id="studentId" placeholder="Enter your student ID" value="1">
+        
+        <label for="shift">Shift:</label>
+        <select id="shift">
+            <option value="Morning">Morning</option>
+            <option value="Evening">Evening</option>
+        </select>
+        
+        <label for="reason">Reason (if not coming):</label>
+        <input type="text" id="reason" placeholder="Optional: Sick, Holiday, etc.">
+        
+        <div class="option yes" onclick="markAttendance(true)">
+            ✅ I'm Coming Today
+        </div>
+        
+        <div class="option no" onclick="markAttendance(false)">
+            ❌ I'm NOT Coming Today
+        </div>
+        
+        <div id="status"></div>
+    </div>
+
+    <script>
+        async function markAttendance(isComing) {
+            const studentId = document.getElementById('studentId').value;
+            const shift = document.getElementById('shift').value;
+            const reason = document.getElementById('reason').value;
+            
+            if (!studentId) {
+                alert('Please enter your student ID');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/student/mark-attendance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        student_id: parseInt(studentId),
+                        is_coming: isComing,
+                        shift: shift,
+                        reason: isComing ? null : reason
+                    })
+                });
+                
+                const data = await res.json();
+                
+                const statusDiv = document.getElementById('status');
+                if (data.success) {
+                    statusDiv.className = 'status success';
+                    statusDiv.innerHTML = `✅ ${data.message}`;
+                } else {
+                    statusDiv.className = 'status error';
+                    statusDiv.innerHTML = `❌ Error: ${data.message}`;
+                }
+            } catch (err) {
+                alert('Error marking attendance: ' + err.message);
+            }
+        }
+    </script>
+</body>
+</html>

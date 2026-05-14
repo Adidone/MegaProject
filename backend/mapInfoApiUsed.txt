@@ -1,0 +1,69 @@
+I used Leaflet.js with OpenStreetMap tiles for the frontend map! 🗺️
+Here's the breakdown:
+
+Map Stack:
+1. Leaflet.js (Mapping Library)
+
+Lightweight JavaScript library
+Easy to use
+Free and open-source
+Perfect for interactive maps
+
+html<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+2. OpenStreetMap (Map Tiles)
+
+Free map tiles
+Community-driven mapping data
+No API key required!
+
+javascriptL.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+    maxZoom: 19 
+}).addTo(map);
+3. OpenRouteService API (Routing)
+
+For drawing routes between stops
+Calculating ETA and distance
+You're already using this with your API key
+
+
+Alternative Map Options:
+If you want to switch, here are alternatives:
+Google Maps (Most Popular)
+html<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY"></script>
+
+❌ Requires API key & billing
+✅ Most accurate data
+✅ Best street view
+
+Mapbox (Beautiful & Modern)
+html<script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+
+❌ Requires API key (free tier available)
+✅ Beautiful custom styles
+✅ 3D terrain
+
+Leaflet with Different Tiles:
+Dark Mode:
+javascriptL.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+Satellite View:
+javascriptL.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(map);
+Colorful:
+javascriptL.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
+
+Current Setup (What you have):
+✅ Leaflet.js - Mapping framework
+✅ OpenStreetMap - Free map tiles
+✅ OpenRouteService - Routing API
+Advantages:
+
+🆓 Completely free
+🚀 No API key needed for maps
+⚡ Fast and lightweight
+🌍 Works worldwide
+
+
+Want to switch to a different map style or provider? Let me know! 🗺️

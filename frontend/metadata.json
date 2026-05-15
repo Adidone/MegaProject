@@ -1,0 +1,7 @@
+{
+  "name": "KIT RouteWise Bus Manager",
+  "description": "An automated bus scheduling and management system for colleges, featuring specialized dashboards for Admins, Students, and Drivers.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
